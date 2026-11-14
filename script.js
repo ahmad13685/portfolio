@@ -1,109 +1,187 @@
+/* =====================================================================
+   AHMAD'S DESKTOP
+   1 Helpers · 2 Config · 3 Windows & dock · 4 Contact · 5 Wallpaper
+   6 Lock screen · 7 Keyboard · 8 Music · 9 Projects · 10 WhatsApp · 11 Polish
+   ===================================================================== */
+
+/* ---------- 1. Helpers ---------- */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const toast = $('#toast');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isMobileSheet = () => window.innerWidth <= 700;
 let toastTimer;
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 2300);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
 }
-function openWindow(name) {
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  remove(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } }
+};
+// Keep Tab inside a modal (wallpaper sheet, WhatsApp form).
+function trapTab(container, e) {
+  if (e.key !== 'Tab') return;
+  const items = $$('button:not([hidden]), input, textarea, a[href]', container).filter(n => !n.disabled && n.offsetParent !== null);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+/* ---------- 2. Config (edit these) ---------- */
+const PORTFOLIO_CONFIG = {
+  email: 'ahmadraza34018@gmail.com',
+  github: 'https://github.com/ahmad13685',
+  linkedin: 'https://www.linkedin.com/in/ahmad-raza-92baa633a/',
+  instagram: '',
+  whatsapp: '923192347309'          // country code + number, digits only
+};
+
+/* ---------- 3. Windows & dock ---------- */
+const windowLayer = $('#windowLayer');
+let zTop = 10;
+let windowOpener = null;
+
+function syncDock() {
+  $$('.dock [data-open]').forEach(btn => {
+    const win = $(`#window-${btn.dataset.open}`);
+    const open = !!win && !win.hidden;
+    btn.classList.toggle('is-open', open);
+    if (open) btn.setAttribute('aria-current', 'true'); else btn.removeAttribute('aria-current');
+  });
+}
+function resetWindowPosition(win) {
+  ['inset', 'margin', 'left', 'top', 'transform', 'transition'].forEach(p => { win.style[p] = ''; });
+}
+function placeWindow(win, left, top) {
+  const layer = windowLayer.getBoundingClientRect();
+  const maxLeft = Math.max(8, layer.width - win.offsetWidth - 8);
+  const maxTop = Math.max(0, layer.height - 64);
+  win.style.inset = 'auto';
+  win.style.margin = '0';
+  win.style.left = `${Math.min(maxLeft, Math.max(8, left))}px`;
+  win.style.top = `${Math.min(maxTop, Math.max(0, top))}px`;
+}
+function openWindow(name, opener) {
   const target = $(`#window-${name}`);
-  if (!target) return;
-  $$('.app-window').forEach(win => { win.hidden = win !== target; });
-  target.hidden = false;
-  target.style.zIndex = String(Date.now() % 10000);
+  if (!target || locked) return;
+  const wasOpen = !target.hidden;
+  $$('.app-window').forEach(win => { if (win !== target) win.hidden = true; });
+  if (!wasOpen) { resetWindowPosition(target); target.hidden = false; }
+  target.style.zIndex = String(++zTop);
+  windowOpener = opener || document.activeElement;
+  syncDock();
+  target.focus({ preventScroll: true });
 }
 function closeWindow(name) {
   const target = $(`#window-${name}`);
-  if (target) target.hidden = true;
+  if (!target || target.hidden) return;
+  target.hidden = true;
+  syncDock();
+  if (windowOpener && document.contains(windowOpener) && windowOpener.offsetParent !== null) windowOpener.focus({ preventScroll: true });
 }
-$$('[data-open]').forEach(button => button.addEventListener('click', () => openWindow(button.dataset.open)));
+function closeAllWindows() {
+  $$('.app-window').forEach(win => { win.hidden = true; });
+  syncDock();
+}
+$$('[data-open]').forEach(button => button.addEventListener('click', () => openWindow(button.dataset.open, button)));
 $$('[data-close]').forEach(button => button.addEventListener('click', () => closeWindow(button.dataset.close)));
-// Wallpaper switching is handled by the wallpaper manager at the bottom of this file.
 
-// Make windows draggable on desktop using their title bar.
+// Title bar: drag the window on desktop, swipe it down to dismiss on phones.
 $$('.app-window').forEach(win => {
   const bar = $('.window-bar', win);
-  let dragging = false, startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+  let mode = null, startX = 0, startY = 0, baseLeft = 0, baseTop = 0, dy = 0;
   bar.addEventListener('pointerdown', event => {
-    if (event.target.closest('button') || window.innerWidth < 700) return;
-    dragging = true;
-    const rect = win.getBoundingClientRect();
-    win.style.transform = 'none';
-    win.style.left = `${rect.left}px`;
-    win.style.top = `${rect.top}px`;
-    startX = event.clientX; startY = event.clientY;
-    initialLeft = rect.left; initialTop = rect.top;
+    if (event.target.closest('button') || event.button > 0) return;
+    startX = event.clientX; startY = event.clientY; dy = 0;
+    if (isMobileSheet()) {
+      mode = 'sheet';
+      win.style.transition = 'none';
+    } else {
+      mode = 'drag';
+      const rect = win.getBoundingClientRect();
+      const layer = windowLayer.getBoundingClientRect();
+      baseLeft = rect.left - layer.left; baseTop = rect.top - layer.top;
+      placeWindow(win, baseLeft, baseTop);
+    }
+    win.style.zIndex = String(++zTop);
     bar.setPointerCapture(event.pointerId);
-    win.style.zIndex = String(Date.now() % 10000);
   });
   bar.addEventListener('pointermove', event => {
-    if (!dragging) return;
-    const maxLeft = window.innerWidth - win.offsetWidth;
-    const maxTop = window.innerHeight - 100;
-    win.style.left = `${Math.max(8, Math.min(maxLeft - 8, initialLeft + event.clientX - startX))}px`;
-    win.style.top = `${Math.max(58, Math.min(maxTop, initialTop + event.clientY - startY))}px`;
+    if (!mode) return;
+    if (mode === 'drag') placeWindow(win, baseLeft + event.clientX - startX, baseTop + event.clientY - startY);
+    else { dy = Math.max(0, event.clientY - startY); win.style.transform = `translateY(${dy}px)`; }
   });
-  const stopDrag = () => { dragging = false; };
-  bar.addEventListener('pointerup', stopDrag);
-  bar.addEventListener('pointercancel', stopDrag);
+  const end = event => {
+    if (!mode) return;
+    const wasSheet = mode === 'sheet';
+    mode = null;
+    if (!wasSheet) return;
+    win.style.transition = 'transform .3s cubic-bezier(.22,.8,.24,1)';
+    if (event.type === 'pointerup' && dy > 90) { closeWindow(win.dataset.window); resetWindowPosition(win); }
+    else win.style.transform = '';
+  };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
 });
+// Keep a dragged window on screen if the viewport changes.
+window.addEventListener('resize', () => {
+  $$('.app-window').forEach(win => {
+    if (win.hidden) return;
+    if (isMobileSheet()) resetWindowPosition(win);
+    else if (win.style.left) placeWindow(win, parseFloat(win.style.left), parseFloat(win.style.top));
+  });
+});
+
+/* ---------- 4. Contact: email, socials, clock ---------- */
+$('#emailText').textContent = PORTFOLIO_CONFIG.email;
+$('#mailtoBtn').href = `mailto:${PORTFOLIO_CONFIG.email}?subject=${encodeURIComponent('Hello Ahmad')}`;
 $('#copyEmail').addEventListener('click', async () => {
-  const email = $('#emailText').textContent.trim();
-  try {
-    await navigator.clipboard.writeText(email);
+  const email = PORTFOLIO_CONFIG.email;
+  const done = () => {
     showToast('Email copied to clipboard');
-  } catch {
-    showToast(`Replace this email in script.js: ${email}`);
+    const btn = $('#copyEmail');
+    btn.textContent = 'Copied'; btn.classList.add('is-done');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('is-done'); }, 1800);
+  };
+  try { await navigator.clipboard.writeText(email); done(); }
+  catch {
+    // Older browsers / insecure contexts: select the text so it can be copied by hand.
+    const range = document.createRange(); range.selectNodeContents($('#emailText'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    showToast('Press Ctrl/Cmd + C to copy');
   }
+});
+$$('[data-social]').forEach(link => {
+  const url = PORTFOLIO_CONFIG[link.dataset.social];
+  if (url) { link.href = url; return; }
+  link.addEventListener('click', e => { e.preventDefault(); showToast('That link is coming soon'); });
 });
 function updateClock() {
   $('#clock').textContent = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date());
 }
 updateClock();
 setInterval(updateClock, 30000);
+$('#year').textContent = new Date().getFullYear();
 
-// Personalize these values before publishing.
-const PORTFOLIO_CONFIG = {
-  email: 'ahmadraza34018@gmail.com',
-  // Add your real social URLs here when ready.
-  github: 'https://github.com/ahmad13685',
-  linkedin: 'https://www.linkedin.com/in/ahmad-raza-92baa633a/?isSelfProfile=true',
-  instagram: ''
-};
-$('#emailText').textContent = PORTFOLIO_CONFIG.email;
-
-// GitHub / LinkedIn icons (dock + Contact window). Add your URLs in PORTFOLIO_CONFIG above.
-$$('[data-social]').forEach(link => {
-  const url = PORTFOLIO_CONFIG[link.dataset.social];
-  if (url) { link.href = url; return; }
-  link.addEventListener('click', e => {
-    e.preventDefault();
-    showToast(`Add your ${link.dataset.social} link in script.js (PORTFOLIO_CONFIG)`);
-  });
-});
-
-
-/* =====================================================================
-   WALLPAPER MANAGER  (presets + your own uploaded photo)
-   ===================================================================== */
+/* ---------- 5. Wallpaper manager (presets + your own photo) ---------- */
 const WALL_KEY = 'portfolio.wallpaper';
 const CUSTOM_KEY = 'portfolio.wallpaper.custom';
-const WALL_NAMES = { onyx: 'Onyx', graphite: 'Graphite', slate: 'Slate', snow: 'Snow', silver: 'Silver', custom: 'Your photo' };
-const LIGHT_WALLPAPERS = ['snow', 'silver'];   // everything else uses the matte-black theme
+const DEFAULT_WALL = 'eclipse';
+const WALL_NAMES = { eclipse: 'Eclipse', mono: 'Mono', aurora: 'Aurora', onyx: 'Onyx', graphite: 'Graphite', slate: 'Slate', snow: 'Snow', silver: 'Silver', custom: 'Your photo' };
+const LIGHT_WALLPAPERS = ['mono', 'snow', 'silver'];   // everything else uses the dark theme
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const ALLOWED_EXT = /\.(jpe?g|png|webp)$/i;
 const MAX_FILE_MB = 30;       // refuse absurdly large files
 const MAX_SIDE_PX = 2000;     // photo is resized to this before saving
 
 const wallInput = $('#wallpaperInput');
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); return true; } catch { return false; } },
-  remove(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } }
-};
+const wallBase = $('#wallpaperImage');
+const themeMeta = $('meta[name="theme-color"]');
 let customWallpaper = null;
 
 function setCustomImage(dataUrl) {
@@ -119,10 +197,26 @@ function clearCustomImage() {
   $('#wallRemove').hidden = true;
   store.remove(CUSTOM_KEY);
 }
+// Fade from the old wallpaper to the new one instead of snapping.
+function crossfadeFromCurrent() {
+  if (reduceMotion) return;
+  const cs = getComputedStyle(wallBase);
+  const ghost = document.createElement('div');
+  ghost.className = 'wallpaper-ghost';
+  ghost.setAttribute('aria-hidden', 'true');
+  ['backgroundImage', 'backgroundSize', 'backgroundPosition', 'backgroundRepeat', 'backgroundColor'].forEach(p => { ghost.style[p] = cs[p]; });
+  wallBase.after(ghost);
+  requestAnimationFrame(() => requestAnimationFrame(() => { ghost.style.opacity = '0'; }));
+  setTimeout(() => ghost.remove(), 800);
+}
 function applyWallpaper(name, { silent = false } = {}) {
-  if (!WALL_NAMES[name] || (name === 'custom' && !customWallpaper)) name = 'onyx';
+  if (!WALL_NAMES[name] || (name === 'custom' && !customWallpaper)) name = DEFAULT_WALL;
+  if (!silent && document.body.dataset.wallpaper !== name) crossfadeFromCurrent();
+  const theme = LIGHT_WALLPAPERS.includes(name) ? 'light' : 'dark';
   document.body.dataset.wallpaper = name;
-  document.body.dataset.theme = LIGHT_WALLPAPERS.includes(name) ? 'light' : 'dark';
+  document.body.dataset.theme = theme;
+  document.documentElement.dataset.theme = theme;
+  if (themeMeta) themeMeta.content = theme === 'light' ? '#ececec' : '#08090c';
   $$('[data-wall]').forEach(el => {
     const on = el.dataset.wall === name;
     el.classList.toggle('active', on);
@@ -158,6 +252,7 @@ async function handleWallpaperFile(file) {
   const typeOk = ALLOWED_TYPES.includes(file.type) || (!file.type && ALLOWED_EXT.test(file.name));
   if (!typeOk || !ALLOWED_EXT.test(file.name)) { showToast('Please choose a JPG, PNG or WEBP image'); return; }
   if (file.size > MAX_FILE_MB * 1024 * 1024) { showToast(`That image is too large (max ${MAX_FILE_MB} MB)`); return; }
+  showToast('Preparing your wallpaper…');
   try {
     const dataUrl = await fileToWallpaper(file);
     setCustomImage(dataUrl);
@@ -178,7 +273,7 @@ wallInput.addEventListener('change', async () => {
 $('#wallRemove').addEventListener('click', () => {
   const wasCustom = document.body.dataset.wallpaper === 'custom';
   clearCustomImage();
-  if (wasCustom) applyWallpaper('onyx', { silent: true });
+  if (wasCustom) applyWallpaper(DEFAULT_WALL, { silent: true });
   showToast('Your photo was removed');
 });
 
@@ -186,16 +281,16 @@ $('#wallRemove').addEventListener('click', () => {
 (() => {
   const savedImg = store.get(CUSTOM_KEY);
   if (savedImg && savedImg.startsWith('data:image/')) setCustomImage(savedImg);
-  applyWallpaper(store.get(WALL_KEY) || 'onyx', { silent: true });
+  applyWallpaper(store.get(WALL_KEY) || DEFAULT_WALL, { silent: true });
 })();
 
-/* ---- wallpaper browser sheet ---- */
+/* wallpaper browser sheet */
 const wallBackdrop = $('#wallBackdrop');
 let wallReturnFocus = null;
 function openWallSheet() {
   wallReturnFocus = document.activeElement;
   wallBackdrop.hidden = false;
-  $('#wallClose').focus();
+  ($('.wall-tile[aria-pressed="true"]', wallBackdrop) || $('#wallClose')).focus();
 }
 function closeWallSheet() {
   if (wallBackdrop.hidden) return;
@@ -206,22 +301,12 @@ $('#browseWallpaperBtn').addEventListener('click', openWallSheet);
 $('#lockBrowseBtn').addEventListener('click', openWallSheet);
 $('#wallClose').addEventListener('click', closeWallSheet);
 wallBackdrop.addEventListener('pointerdown', e => { if (e.target === wallBackdrop) closeWallSheet(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWallSheet(); });
-// keep keyboard focus inside the open sheet
-wallBackdrop.addEventListener('keydown', e => {
-  if (e.key !== 'Tab') return;
-  const items = $$('button:not([hidden])', wallBackdrop);
-  const first = items[0], last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-});
+wallBackdrop.addEventListener('keydown', e => trapTab(wallBackdrop, e));
 
-/* =====================================================================
-   LOCK SCREEN  (live clock, date, swipe / click / key to unlock)
-   ===================================================================== */
+/* ---------- 6. Lock screen (live clock, date, swipe / click / key to unlock) ---------- */
 const lockScreen = $('#lockScreen');
 const lockHM = $('#lockHM'), lockPeriod = $('#lockPeriod'), lockSec = $('#lockSec'), lockDate = $('#lockDate');
-const desktopParts = $$('.topbar, .desktop, .window-layer, .dock');
+const desktopParts = $$('.topbar, .desktop, .window-layer, .dock, .wallpaper-control, .music-widget');
 const hmFormat = new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' });
 const dateFormat = new Intl.DateTimeFormat([], { weekday: 'long', day: 'numeric', month: 'long' });
 let clockTimer = null, locked = true, lockSwitchTimer = null;
@@ -265,7 +350,7 @@ function lockNow() {
   if (locked) return;
   locked = true;
   closeWallSheet();
-  $$('.app-window').forEach(win => { win.hidden = true; });
+  closeAllWindows();
   setDesktopInert(true);
   startLockClock();
   lockScreen.hidden = false;
@@ -313,13 +398,6 @@ function lockNow() {
   window.addEventListener('pointercancel', finish);
 })();
 $('#lockHint').addEventListener('click', unlock);
-document.addEventListener('keydown', e => {
-  if (!locked || !wallBackdrop.hidden) return;
-  if (!['Enter', ' ', 'ArrowUp'].includes(e.key)) return;
-  if (e.target.closest('.lock-tool')) return;      // let the corner buttons keep their own behaviour
-  e.preventDefault();
-  unlock();
-});
 lockScreen.addEventListener('wheel', e => { if (e.deltaY > 30) unlock(); }, { passive: true });
 $('#lockNow').addEventListener('click', lockNow);
 
@@ -328,77 +406,169 @@ setDesktopInert(true);
 startLockClock();
 lockScreen.focus({ preventScroll: true });
 
-
-// Esc closes the open window (the wallpaper sheet, if open, closes first).
+/* ---------- 7. Keyboard ---------- */
+const whatsappModal = $('#whatsappContactModal');
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Escape' || locked || !wallBackdrop.hidden) return;
-  $$('.app-window').forEach(win => { win.hidden = true; });
+  // Lock screen: Enter, Space or Arrow Up unlocks (unless a wallpaper control has focus).
+  if (locked && wallBackdrop.hidden) {
+    if (!['Enter', ' ', 'ArrowUp'].includes(e.key)) return;
+    if (e.target.closest && e.target.closest('.lock-tool')) return;
+    e.preventDefault();
+    unlock();
+    return;
+  }
+  // Esc closes the top-most layer first: WhatsApp form, wallpaper sheet, music panel, then windows.
+  if (e.key !== 'Escape') return;
+  if (whatsappModal && !whatsappModal.hidden) { closeWhatsAppModal(); return; }
+  if (!wallBackdrop.hidden) { closeWallSheet(); return; }
+  if (locked) return;
+  const panel = $('#musicPanel');
+  if (panel && !panel.hidden) { panel.hidden = true; $('#musicTogglePanel').setAttribute('aria-expanded', 'false'); return; }
+  closeAllWindows();
 });
 
-
-/* Single-track music player. Add a licensed MP3 at assets/portfolio-track.mp3. */
+/* ---------- 8. Music player (single track, never autoplays) ---------- */
 (() => {
   const audio = $('#portfolioAudio'), panel = $('#musicPanel'), toggle = $('#musicTogglePanel');
   const play = $('#musicPlayPause'), progress = $('#musicProgress');
   if (!audio || !panel || !toggle || !play || !progress) return;
   const playLabel = $('#musicPlayLabel'), playIcon = $('#musicPlayIcon');
   const elapsed = $('#musicElapsed'), duration = $('#musicDuration'), hint = $('#musicHint');
+  const volume = $('#musicVolume'), mute = $('#musicMute'), wave = $('#musicVolWave');
+  const widget = $('#musicWidget');
+  const IDLE_HINT = 'Nothing plays until you press play.';
+  const VOL_KEY = 'portfolio.volume';
   let missingTrack = false;
+
   const formatTime = value => {
     if (!Number.isFinite(value) || value < 0) return '0:00';
     const n = Math.floor(value);
     return `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
   };
+  const paintRange = input => {
+    const max = Number(input.max) || 1;
+    input.style.setProperty('--pct', `${Math.min(100, (Number(input.value) / max) * 100)}%`);
+  };
   const updatePlayUI = playing => {
     play.setAttribute('aria-label', playing ? 'Pause music' : 'Play music');
-    play.title = playing ? 'Pause' : 'Play'; playLabel.textContent = playing ? 'Pause' : 'Play';
+    play.title = playing ? 'Pause' : 'Play';
+    playLabel.textContent = playing ? 'Pause' : 'Play';
     playIcon.innerHTML = playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z" />' : '<path d="M8 5v14l11-7z" />';
-    $('#musicWidget').classList.toggle('is-playing', playing);
+    widget.classList.toggle('is-playing', playing);
   };
-  const closePanel = () => { panel.hidden = true; toggle.setAttribute('aria-expanded', 'false'); };
-  toggle.addEventListener('click', () => {
-    panel.hidden = !panel.hidden;
-    toggle.setAttribute('aria-expanded', String(!panel.hidden));
-  });
-  $('#musicClose').addEventListener('click', closePanel);
+  const setOpen = open => {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close music player' : 'Open music player');
+    if (open) play.focus({ preventScroll: true });
+  };
+  const seekBy = seconds => {
+    if (!Number.isFinite(audio.duration)) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration, audio.currentTime + seconds));
+  };
+  const syncVolumeUI = () => {
+    const silent = audio.muted || audio.volume === 0;
+    wave.style.display = silent ? 'none' : '';
+    mute.setAttribute('aria-label', silent ? 'Unmute' : 'Mute');
+    mute.title = silent ? 'Unmute' : 'Mute';
+    paintRange(volume);
+  };
+
+  toggle.addEventListener('click', () => setOpen(panel.hidden));
+  $('#musicClose').addEventListener('click', () => { setOpen(false); toggle.focus({ preventScroll: true }); });
   play.addEventListener('click', async () => {
     if (missingTrack || audio.error) {
-      hint.innerHTML = 'Music file not found. Add your MP3 as <code>assets/portfolio-track.mp3</code>, then refresh.';
-      showToast('Add your music file to assets/portfolio-track.mp3'); return;
+      hint.textContent = "The soundtrack couldn't be loaded right now.";
+      showToast("Couldn't load the music file"); return;
     }
     if (audio.paused) {
       try { await audio.play(); hint.textContent = 'Enjoy the music.'; }
-      catch { hint.innerHTML = 'Could not play the track. Check that <code>assets/portfolio-track.mp3</code> exists and is valid.'; showToast('Music could not start. Check the MP3 file.'); }
+      catch { hint.textContent = "Playback was blocked by the browser. Try pressing play again."; showToast('Music could not start'); }
     } else audio.pause();
+  });
+  $('#musicBack').addEventListener('click', () => seekBy(-10));
+  $('#musicFwd').addEventListener('click', () => seekBy(10));
+  mute.addEventListener('click', () => {
+    audio.muted = !audio.muted;
+    if (!audio.muted && audio.volume === 0) { audio.volume = 0.5; volume.value = '0.5'; }
+    syncVolumeUI();
+  });
+  volume.addEventListener('input', () => {
+    audio.volume = Number(volume.value); audio.muted = false;
+    store.set(VOL_KEY, volume.value);
+    syncVolumeUI();
   });
   audio.addEventListener('play', () => updatePlayUI(true));
   audio.addEventListener('pause', () => updatePlayUI(false));
-  audio.addEventListener('ended', () => { updatePlayUI(false); audio.currentTime = 0; });
-  audio.addEventListener('loadedmetadata', () => { duration.textContent = formatTime(audio.duration); progress.max = String(audio.duration || 100); hint.textContent = 'Enjoy the music.'; });
-  audio.addEventListener('timeupdate', () => {
-    if (!progress.matches(':active')) progress.value = String(audio.currentTime || 0);
-    elapsed.textContent = formatTime(audio.currentTime); duration.textContent = formatTime(audio.duration);
+  audio.addEventListener('ended', () => { updatePlayUI(false); audio.currentTime = 0; hint.textContent = IDLE_HINT; });
+  audio.addEventListener('loadstart', () => { if (audio.paused) hint.textContent = 'Loading track…'; });
+  audio.addEventListener('loadedmetadata', () => {
+    duration.textContent = formatTime(audio.duration);
+    progress.max = String(audio.duration || 100);
+    paintRange(progress);
+    if (audio.paused) hint.textContent = IDLE_HINT;
   });
-  progress.addEventListener('input', () => { if (Number.isFinite(audio.duration)) { audio.currentTime = Number(progress.value); elapsed.textContent = formatTime(audio.currentTime); } });
-  audio.addEventListener('error', () => { missingTrack = true; updatePlayUI(false); hint.innerHTML = 'No track found yet. Place one MP3 file at <code>assets/portfolio-track.mp3</code>.'; });
+  audio.addEventListener('timeupdate', () => {
+    if (!progress.matches(':active')) { progress.value = String(audio.currentTime || 0); paintRange(progress); }
+    elapsed.textContent = formatTime(audio.currentTime);
+    duration.textContent = formatTime(audio.duration);
+  });
+  progress.addEventListener('input', () => {
+    paintRange(progress);
+    if (Number.isFinite(audio.duration)) { audio.currentTime = Number(progress.value); elapsed.textContent = formatTime(audio.currentTime); }
+  });
+  audio.addEventListener('error', () => { missingTrack = true; updatePlayUI(false); hint.textContent = "The soundtrack couldn't be loaded right now."; });
+
+  const savedVol = parseFloat(store.get(VOL_KEY));
+  if (Number.isFinite(savedVol) && savedVol >= 0 && savedVol <= 1) volume.value = String(savedVol);
+  audio.volume = Number(volume.value);
+  syncVolumeUI();
   updatePlayUI(false);
 })();
 
-
 /* =====================================================================
-   PROJECTS  -  edit ONLY this list. Each object = one project card.
-   live  : your deployed link (leave '' to show "Coming soon")
-   code  : GitHub repo link (optional, leave '')
-   image : screenshot in assets/projects/ e.g. 'assets/projects/luxe.jpg' (optional)
+   9. PROJECTS  -  edit ONLY this list. Each object = one project card.
+   title         : project name
+   type          : filter label, e.g. 'E-commerce', 'Web App', 'Landing Page'
+   status        : short badge, e.g. 'In progress', 'Practice project', 'Completed'
+   desc          : one or two honest sentences about what it does
+   contribution  : what YOU did on it (leave '' to hide the row)
+   tags          : technologies used
+   live          : deployed link (leave '' if there is none yet)
+   code          : GitHub repo link (leave '' if there is none yet)
+   image         : screenshot, e.g. 'assets/projects/luxe-store.jpg' (leave '' until you have one)
+   wire          : placeholder sketch shown until a screenshot exists: 'store' | 'keypad' | 'page'
    ===================================================================== */
 const PROJECTS = [
-  { title: 'Luxe Store',       type: 'E-commerce',  desc: 'Online store with customer login, categories, wishlist and order flow.', tags: ['Laravel', 'PHP', 'MySQL'], live: '', code: '', image: '' },
-  { title: 'calculator',      type: 'Web App',     desc: 'Short one-line description of what this project does.',                  tags: ['HTML', 'CSS', 'JS'],        live: '', code: '', image: '' },
-  { title: 'Project Three',    type: 'Landing Page',desc: 'Short one-line description of what this project does.',                  tags: ['HTML', 'CSS', 'JS'],       live: '', code: '', image: '' },
-  { title: 'Project Four',     type: 'Web App',     desc: 'Short one-line description of what this project does.',                  tags: ['PHP', 'MySQL'],            live: '', code: '', image: '' },
-  { title: 'Project Five',     type: 'Landing Page',desc: 'Short one-line description of what this project does.',                  tags: ['WordPress', 'Elementor'],  live: '', code: '', image: '' },
-  { title: 'Project Six',      type: 'Practice',    desc: 'Short one-line description of what this project does.',                  tags: ['JavaScript'],              live: '', code: '', image: '' },
-  { title: 'Project Seven',    type: 'Practice',    desc: 'Short one-line description of what this project does.',                  tags: ['HTML', 'CSS'],             live: '', code: '', image: '' }
+  {
+    title: 'Luxe Store',
+    type: 'E-commerce',
+    status: 'In progress',
+    desc: 'An online store with customer login, categories, a wishlist and an order flow.',
+    contribution: 'Personal project. Building it while I learn Laravel.',
+    tags: ['Laravel', 'PHP', 'MySQL'],
+    live: '', code: '', image: '', wire: 'store'
+  },
+  {
+    title: 'Calculator',
+    type: 'Web App',
+    status: 'Practice project',
+    desc: 'A calculator built with HTML, CSS and JavaScript.',
+    contribution: 'Personal practice project.',
+    tags: ['HTML', 'CSS', 'JavaScript'],
+    live: '', code: '', image: '', wire: 'keypad'
+  }
+  /* Add the next one by copying this block (and remember the comma after the project above):
+  ,{
+    title: 'Project name',
+    type: 'Landing Page',
+    status: 'Completed',
+    desc: 'What it does, in one or two honest sentences.',
+    contribution: 'What you built or decided on this project.',
+    tags: ['HTML', 'CSS', 'JavaScript'],
+    live: 'https://…', code: 'https://github.com/…', image: 'assets/projects/name.jpg', wire: 'page'
+  }
+  */
 ];
 
 (() => {
@@ -409,30 +579,71 @@ const PROJECTS = [
   const hues = [215, 265, 25, 160, 340, 190, 45];
   let active = 'All';
 
+  function wireframe(kind) {
+    const wf = el('div', 'wf');
+    const add = (cls, parent = wf) => { const n = el('i', cls); parent.append(n); return n; };
+    if (kind === 'keypad') {
+      add('screen');
+      const keys = el('div', 'wf-keys'); for (let k = 0; k < 16; k++) add('', keys); wf.append(keys);
+    } else {
+      add('l1'); add('l2'); add('hero');
+      const cards = el('div', 'wf-cards'); for (let k = 0; k < 4; k++) add('', cards); wf.append(cards);
+    }
+    return wf;
+  }
+
   function card(p, i) {
     const art = el('div', 'proj-art');
     art.style.setProperty('--h', hues[i % hues.length]);
-    if (p.image) { const img = el('img'); img.src = p.image; img.alt = `${p.title} screenshot`; img.loading = 'lazy'; img.onerror = () => img.remove(); art.append(img); }
-    art.append(el('span', 'proj-num', String(i + 1).padStart(2, '0')), el('span', 'proj-initial', p.title.trim().charAt(0).toUpperCase()));
+    const shot = el('div', 'shot');
+    const bar = el('div', 'shot-bar'); bar.append(el('i'), el('i'), el('i'), el('b'));
+    const bodyShot = el('div', 'shot-body');
+    bodyShot.append(wireframe(p.wire || (p.type === 'E-commerce' ? 'store' : 'page')));
+    if (p.image) {
+      const img = el('img'); img.alt = `${p.title} screenshot`; img.loading = 'lazy'; img.decoding = 'async';
+      img.onload = () => shot.classList.add('has-img');
+      img.onerror = () => img.remove();
+      img.src = p.image;
+      bodyShot.append(img);
+    }
+    bodyShot.append(el('span', 'shot-note', 'Screenshot coming soon'));
+    shot.append(bar, bodyShot);
+    const status = el('span', 'proj-status');
+    if (/progress/i.test(p.status || '')) status.append(el('i', 'pulse'));
+    status.append(document.createTextNode(p.status || 'Project'));
+    art.append(shot, el('span', 'proj-num', String(i + 1).padStart(2, '0')), status);
+
     const body = el('div', 'proj-body');
-    body.append(el('span', 'project-type', p.type.toUpperCase()), el('h3', '', p.title), el('p', '', p.desc));
-    const tags = el('div', 'tags'); p.tags.forEach(t => tags.append(el('span', '', t)));
+    body.append(el('span', 'project-type', (p.type || '').toUpperCase()), el('h3', '', p.title), el('p', '', p.desc));
+    if (p.contribution) {
+      const part = el('dl', 'proj-part');
+      part.append(el('dt', '', 'my part'), el('dd', '', p.contribution));
+      body.append(part);
+    }
+    const tags = el('div', 'tags'); (p.tags || []).forEach(t => tags.append(el('span', '', t)));
     const actions = el('div', 'proj-actions');
-    const live = safeUrl(p.live);
+    const live = safeUrl(p.live), code = safeUrl(p.code);
     if (live) { const a = el('a', 'proj-live', 'Live demo ↗'); a.href = live; a.target = '_blank'; a.rel = 'noopener noreferrer'; actions.append(a); }
-    else actions.append(el('span', 'proj-live is-soon', 'Coming soon'));
-    const code = safeUrl(p.code);
-    if (code) { const a = el('a', 'proj-code', 'Code'); a.href = code; a.target = '_blank'; a.rel = 'noopener noreferrer'; actions.append(a); }
+    if (code) { const a = el('a', 'proj-code', 'GitHub'); a.href = code; a.target = '_blank'; a.rel = 'noopener noreferrer'; actions.append(a); }
+    if (!live && !code) actions.append(el('span', 'proj-soon', 'Not published yet'));
     body.append(tags, actions);
-    const art2 = el('article', 'proj-card'); art2.append(art, body);
-    return art2;
+    const article = el('article', 'proj-card');
+    article.style.animationDelay = `${Math.min(i, 6) * 60}ms`;
+    article.append(art, body);
+    return article;
+  }
+  function emptySlot() {
+    const slot = el('article', 'proj-card proj-empty');
+    slot.append(el('span', 'plus', '+'), el('b', '', 'Next project'), el('span', '', 'Still in the workshop. It will show up here once there is something real to show.'));
+    return slot;
   }
   function render() {
     grid.replaceChildren();
     const list = PROJECTS.map((p, i) => ({ p, i })).filter(({ p }) => active === 'All' || p.type === active);
     list.forEach(({ p, i }) => grid.append(card(p, i)));
+    if (active === 'All') grid.append(emptySlot());
     count.textContent = `${list.length} project${list.length === 1 ? '' : 's'}`;
-    $$('.proj-chip', filters).forEach(b => b.classList.toggle('active', b.dataset.f === active));
+    $$('.proj-chip', filters).forEach(b => { const on = b.dataset.f === active; b.classList.toggle('active', on); b.setAttribute('aria-pressed', String(on)); });
   }
   ['All', ...new Set(PROJECTS.map(p => p.type))].forEach(f => {
     const b = el('button', 'proj-chip', f); b.type = 'button'; b.dataset.f = f;
@@ -442,41 +653,48 @@ const PROJECTS = [
   render();
 })();
 
-
-// WhatsApp popup form. The visitor stays on the portfolio until submitting.
-const whatsappModal = $('#whatsappContactModal');
+/* ---------- 10. WhatsApp popup form (visitor stays here until they submit) ---------- */
 const whatsappDockBtn = $('#whatsappDockBtn');
-const whatsappModalClose = $('#whatsappModalClose');
 const whatsappContactForm = $('#whatsappContactForm');
-const WHATSAPP_NUMBER = '923192347309';
+let whatsappReturnFocus = null;
 
-function openWhatsAppModal() {
+function openWhatsAppModal(opener) {
   if (!whatsappModal) return;
+  whatsappReturnFocus = opener || document.activeElement;
   whatsappModal.hidden = false;
   document.body.style.overflow = 'hidden';
   $('#whatsappVisitorName').focus();
 }
 function closeWhatsAppModal() {
-  if (!whatsappModal) return;
+  if (!whatsappModal || whatsappModal.hidden) return;
   whatsappModal.hidden = true;
-  document.body.style.overflow = '';
-  whatsappDockBtn?.focus();
+  document.body.style.overflow = locked ? 'hidden' : '';
+  if (whatsappReturnFocus && document.contains(whatsappReturnFocus)) whatsappReturnFocus.focus();
 }
-whatsappDockBtn?.addEventListener('click', openWhatsAppModal);
-whatsappModalClose?.addEventListener('click', closeWhatsAppModal);
-whatsappModal?.addEventListener('click', event => {
-  if (event.target === whatsappModal) closeWhatsAppModal();
-});
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && whatsappModal && !whatsappModal.hidden) closeWhatsAppModal();
-});
+whatsappDockBtn?.addEventListener('click', () => openWhatsAppModal(whatsappDockBtn));
+$('#contactWhatsApp')?.addEventListener('click', e => openWhatsAppModal(e.currentTarget));
+$('#whatsappModalClose')?.addEventListener('click', closeWhatsAppModal);
+whatsappModal?.addEventListener('pointerdown', event => { if (event.target === whatsappModal) closeWhatsAppModal(); });
+whatsappModal?.addEventListener('keydown', e => trapTab(whatsappModal, e));
 whatsappContactForm?.addEventListener('submit', event => {
   event.preventDefault();
   const name = $('#whatsappVisitorName').value.trim();
   const message = $('#whatsappVisitorMessage').value.trim();
   if (!name || !message) return;
   const text = `Hello Ahmad! My name is ${name}.\n\n${message}`;
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+  const url = `https://wa.me/${PORTFOLIO_CONFIG.whatsapp}?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank', 'noopener,noreferrer');
+  whatsappContactForm.reset();
   closeWhatsAppModal();
 });
+
+/* ---------- 11. Polish: soft pointer light on desktop cards ---------- */
+if (window.matchMedia('(hover: hover)').matches && !reduceMotion) {
+  $$('.desktop .glass').forEach(card => {
+    card.addEventListener('pointermove', e => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    });
+  });
+}
