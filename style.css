@@ -1085,3 +1085,156 @@ body.is-locked .toast { bottom: 120px; }
 @media (forced-colors: active) {
   .glass, .app-window, .dock { border: 1px solid CanvasText; }
 }
+
+
+/* ==========================================================
+   CLEAN ONE-PAGE PASS — centered controls, readable layout,
+   and safe scrolling so content never sits underneath the dock.
+   ========================================================== */
+html { min-height: 100%; }
+body { min-height: 100vh; min-height: 100dvh; overflow-x: clip; }
+.desktop {
+  width: min(100%, 1160px);
+  min-height: calc(100dvh - var(--bar-h));
+  padding: calc(var(--bar-h) + clamp(18px, 3vh, 34px)) clamp(16px, 3vw, 34px) calc(var(--dock-h) + 150px);
+  gap: clamp(14px, 1.8vw, 20px);
+  align-content: start;
+}
+.welcome-card { min-width: 0; }
+.welcome-copy { min-width: 0; }
+.welcome-card h1 { font-size: clamp(2.45rem, 4.2vw, 4.15rem); line-height: 1.04; overflow-wrap: anywhere; }
+.intro { max-width: 52ch; }
+.now-widget, .about-widget, .cta-widget { min-width: 0; }
+.about-widget p, .cta-widget p { overflow-wrap: anywhere; }
+.desktop-foot { padding-bottom: 8px; }
+
+/* Keep the wallpaper picker in the visual center, not stranded at an edge. */
+.wallpaper-control {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: calc(var(--dock-h) + 26px);
+  translate: -50% 0;
+  max-width: calc(100vw - 28px);
+  height: 52px;
+  padding: 0 13px;
+  justify-content: center;
+  white-space: nowrap;
+  z-index: 36;
+}
+body.is-locked .wallpaper-control { opacity: 0; pointer-events: none; }
+
+/* Dialogs stay inside the visible viewport; long sections scroll inside them. */
+.window-layer {
+  inset: calc(var(--bar-h) + 8px) 0 calc(var(--dock-h) + 18px) 0;
+}
+.app-window {
+  max-height: calc(100% - 8px);
+  min-height: 0;
+}
+.window-content {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overflow-wrap: anywhere;
+}
+.about-content { grid-template-columns: minmax(0, 1fr) minmax(210px, 250px); }
+.journey { min-width: 0; }
+.proj-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.proj-card, .skill-card, .contact-card { min-width: 0; }
+.skill-text, .contact-text { min-width: 0; overflow-wrap: anywhere; }
+.wall-backdrop { align-items: center; justify-content: center; }
+.wall-sheet {
+  width: min(720px, 100%);
+  max-height: min(82dvh, 700px);
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Compact laptop heights: retain the whole home composition without clipping. */
+@media (min-width: 701px) and (max-height: 820px) {
+  .desktop {
+    padding-top: calc(var(--bar-h) + 14px);
+    padding-bottom: calc(var(--dock-h) + 118px);
+    gap: 14px;
+  }
+  .welcome-card {
+    --pad-x: 28px;
+    column-gap: 24px;
+    padding-top: 24px;
+  }
+  .profile-photo { --size: clamp(142px, 13vw, 180px); }
+  .welcome-card h1 { font-size: clamp(2.4rem, 3.8vw, 3.5rem); margin-bottom: 12px; }
+  .intro { margin-bottom: 18px; font-size: .96rem; }
+  .mini-widget, .project-widget, .quote-widget { padding: 22px; }
+  .status-pill { margin-bottom: 14px; }
+}
+@media (min-width: 701px) and (max-width: 1050px) {
+  .desktop { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .welcome-card, .about-widget { grid-column: 1 / -1; }
+  .now-widget, .cta-widget { grid-column: span 3; }
+  .welcome-card { grid-template-columns: minmax(0, 1fr) auto; }
+  .profile-photo { --size: 156px; }
+}
+
+/* Phones and tablets: one readable column, centered wallpaper picker,
+   and enough bottom clearance for the floating dock. */
+@media (max-width: 700px) {
+  .desktop {
+    width: 100%;
+    min-height: 0;
+    padding: calc(var(--bar-h) + 16px) 14px calc(var(--dock-h) + 170px);
+    gap: 14px;
+  }
+  .welcome-card { width: 100%; }
+  .welcome-card h1 { font-size: clamp(2.5rem, 12vw, 3.55rem); line-height: 1.04; }
+  .intro { max-width: 38ch; }
+  .wallpaper-control {
+    position: fixed;
+    left: 50%;
+    right: auto;
+    bottom: calc(var(--dock-h) + 24px);
+    translate: -50% 0;
+    width: max-content;
+    max-width: calc(100vw - 20px);
+    height: 46px;
+    margin: 0;
+    padding: 0 10px;
+    gap: 5px;
+    overflow-x: auto;
+    justify-content: center;
+  }
+  .wallpaper-control .control-label,
+  .wallpaper-control .control-divider,
+  .wallpaper-control .wallpaper-swatch { display: inline-flex; }
+  .control-label { font-size: 9px; margin: 0 4px 0 2px; }
+  .wallpaper-swatch { width: 25px; height: 25px; flex: 0 0 25px; }
+  .wallpaper-swatch i { width: 19px; height: 19px; }
+  .wall-icon-btn { width: 28px; height: 28px; flex: 0 0 28px; }
+  .window-layer { inset: 0; }
+  .app-window {
+    max-height: min(88dvh, calc(100dvh - 16px));
+    overflow: hidden;
+  }
+  .window-content {
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+  }
+  .wall-backdrop { align-items: center; padding: 10px; }
+  .wall-sheet { width: 100%; max-height: 84dvh; padding: 18px; }
+}
+@media (max-width: 390px) {
+  .wallpaper-control { gap: 3px; padding: 0 7px; }
+  .control-label { font-size: 8px; margin-right: 2px; }
+  .wallpaper-swatch { width: 22px; height: 22px; flex-basis: 22px; }
+  .wallpaper-swatch i { width: 17px; height: 17px; }
+  .wall-icon-btn { width: 25px; height: 25px; flex-basis: 25px; }
+  .dock { gap: 4px; padding-inline: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-card, .mini-widget, .project-widget, .quote-widget,
+  .app-window, .wall-sheet { animation: none !important; }
+}
