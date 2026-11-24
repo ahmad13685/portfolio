@@ -1426,3 +1426,34 @@ body.is-locked .dock { translate: -50% 150px; }
     justify-content: space-between;
   }
 }
+
+
+/* ---------- Final footer clearance and wallpaper-to-dock gap ---------- */
+@media (min-width: 701px) {
+  /* 10px clear gap above the fixed dock. */
+  .wallpaper-control {
+    bottom: 88px;
+  }
+
+  /* Keep footer text outside the card edge, with its own breathing room. */
+  .desktop-foot {
+    position: static;
+    top: auto;
+    margin: 12px 0 0;
+    padding: 10px 4px 24px;
+    min-height: 34px;
+    line-height: 1.6;
+    align-items: center;
+  }
+}
+@media (max-width: 700px) {
+  .wallpaper-control {
+    bottom: calc(var(--dock-h) + 34px);
+  }
+  .desktop-foot {
+    position: static;
+    margin: 10px 0 0;
+    padding: 10px 4px 24px;
+    line-height: 1.6;
+  }
+}
