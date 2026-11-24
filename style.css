@@ -1238,3 +1238,100 @@ body.is-locked .wallpaper-control { opacity: 0; pointer-events: none; }
   .welcome-card, .mini-widget, .project-widget, .quote-widget,
   .app-window, .wall-sheet { animation: none !important; }
 }
+
+
+/* ==========================================================
+   AHmad / PERSONAL EDITORIAL PASS
+   Natural document flow, generous content space, no overlays.
+   ========================================================== */
+:root {
+  --bar-h: 54px;
+  --dock-h: 64px;
+}
+html, body { min-height: 100%; }
+body { overflow-x: hidden; }
+.desktop {
+  width: min(100%, 1180px);
+  max-width: 1180px;
+  min-height: 0;
+  padding: calc(var(--bar-h) + 34px) clamp(18px, 4vw, 48px) 190px;
+  gap: clamp(16px, 2vw, 22px);
+  align-content: start;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.welcome-card { grid-column: span 8; min-height: 370px; }
+.now-widget { grid-column: span 4; min-height: 370px; }
+.about-widget { grid-column: span 7; min-height: 245px; }
+.cta-widget { grid-column: span 5; min-height: 245px; }
+.desktop-foot { padding: 8px 4px 22px; }
+.welcome-card {
+  --pad-x: clamp(24px, 3vw, 38px);
+  align-items: center;
+}
+.welcome-card h1 { font-size: clamp(2.7rem, 5vw, 4.5rem); }
+.intro { max-width: 48ch; }
+.mini-widget, .project-widget, .quote-widget { padding: clamp(22px, 2.8vw, 32px); }
+.wallpaper-control {
+  left: 50%;
+  right: auto;
+  bottom: 92px;
+  translate: -50% 0;
+  z-index: 35;
+}
+.dock {
+  position: fixed;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  z-index: 38;
+}
+body.is-locked .dock { translate: -50% 150px; }
+.wall-backdrop { align-items: center; justify-content: center; }
+.wall-sheet { width: min(720px, calc(100vw - 32px)); max-height: min(82dvh, 700px); overflow-y: auto; }
+.window-layer { inset: calc(var(--bar-h) + 12px) 0 calc(var(--dock-h) + 22px); }
+.app-window { max-height: calc(100% - 12px); }
+.window-content { min-height: 0; overflow-y: auto; overflow-wrap: anywhere; }
+@media (min-width: 701px) and (max-height: 760px) {
+  .desktop { padding-top: calc(var(--bar-h) + 20px); padding-bottom: 190px; }
+  .welcome-card, .now-widget { min-height: 330px; }
+}
+@media (min-width: 701px) and (max-width: 1050px) {
+  .welcome-card, .about-widget { grid-column: 1 / -1; }
+  .now-widget, .cta-widget { grid-column: span 6; }
+}
+@media (max-width: 700px) {
+  :root { --bar-h: 50px; }
+  .desktop {
+    width: 100%;
+    min-height: 0;
+    padding: calc(var(--bar-h) + 18px) 14px 190px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .welcome-card, .now-widget, .about-widget, .cta-widget { grid-column: 1 / -1; min-height: 0; }
+  .welcome-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "copy" "photo" "foot"; }
+  .character-area { justify-self: start; margin-top: 22px; }
+  .profile-photo { --size: 138px; }
+  .welcome-card h1 { font-size: clamp(2.6rem, 12vw, 3.6rem); }
+  .card-foot { margin-top: 22px; }
+  .wallpaper-control {
+    bottom: 88px;
+    width: max-content;
+    max-width: calc(100vw - 18px);
+    overflow-x: auto;
+    justify-content: center;
+  }
+  .dock { max-width: calc(100vw - 16px); gap: 5px; padding: 8px; }
+  .dock-app { --dock-icon: 42px; }
+  .dock-divider { height: 28px; }
+  .window-layer { inset: 0; }
+  .app-window { max-height: min(88dvh, calc(100dvh - 16px)); }
+  .window-content { padding: 20px; padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+  .about-content { grid-template-columns: minmax(0, 1fr); }
+  .journey { position: static; }
+}
+@media (max-width: 390px) {
+  .dock-app { --dock-icon: 36px; }
+  .dock { gap: 3px; }
+  .wallpaper-control { gap: 4px; padding-inline: 7px; }
+}
