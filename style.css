@@ -1335,3 +1335,38 @@ body.is-locked .dock { translate: -50% 150px; }
   .dock { gap: 3px; }
   .wallpaper-control { gap: 4px; padding-inline: 7px; }
 }
+
+
+/* ---------- Compact home cards: reduce oversized first row ---------- */
+@media (min-width: 701px) {
+  .desktop { align-items: start; }
+  .welcome-card {
+    min-height: 0;
+    padding: 26px 30px 0;
+    --pad-x: 30px;
+    column-gap: 22px;
+  }
+  .welcome-card h1 {
+    font-size: clamp(2.45rem, 3.5vw, 3.45rem);
+    line-height: .99;
+    margin-bottom: 12px;
+  }
+  .status-pill { margin-bottom: 14px; }
+  .role-line { margin-bottom: 12px; }
+  .intro { font-size: .96rem; line-height: 1.55; margin-bottom: 18px; }
+  .profile-photo { --size: clamp(132px, 12vw, 164px); }
+  .card-foot { margin-top: 22px; padding-top: 12px; padding-bottom: 12px; }
+  .now-widget {
+    min-height: 0;
+    padding: 24px;
+  }
+  .now-list > div { padding: 11px 0; }
+  .now-foot { margin-top: 28px; padding-top: 0; }
+  .about-widget, .cta-widget { min-height: 0; }
+}
+@media (min-width: 701px) and (max-height: 820px) {
+  .desktop { padding-top: calc(var(--bar-h) + 20px); }
+  .welcome-card { padding-top: 22px; }
+  .profile-photo { --size: clamp(124px, 11vw, 150px); }
+  .now-widget { padding: 22px; }
+}
