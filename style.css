@@ -1370,3 +1370,37 @@ body.is-locked .dock { translate: -50% 150px; }
   .profile-photo { --size: clamp(124px, 11vw, 150px); }
   .now-widget { padding: 22px; }
 }
+
+
+/* ---------- Final spacing polish: keep controls clear of cards and dock ---------- */
+@media (min-width: 701px) {
+  /* Preserve the current card dimensions; only reclaim a little inner space. */
+  .about-widget { padding-bottom: 18px; }
+
+  .wallpaper-control {
+    bottom: 72px;
+    height: 42px;
+    padding-inline: 11px;
+    gap: 6px;
+  }
+  .wallpaper-swatch { width: 23px; height: 23px; flex: 0 0 23px; }
+  .wallpaper-swatch i { width: 17px; height: 17px; }
+  .wall-icon-btn { width: 28px; height: 28px; }
+
+  .dock { bottom: 8px; }
+
+  /* Keep the footer visible above the fixed dock without changing card sizing. */
+  .desktop-foot {
+    position: relative;
+    top: -38px;
+    margin-bottom: -38px;
+  }
+}
+@media (max-width: 700px) {
+  .wallpaper-control {
+    bottom: calc(var(--dock-h) + 30px);
+    height: 42px;
+  }
+  .dock { bottom: max(8px, env(safe-area-inset-bottom)); }
+  .desktop-foot { padding-bottom: 22px; }
+}
