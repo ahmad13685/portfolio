@@ -1404,3 +1404,25 @@ body.is-locked .dock { translate: -50% 150px; }
   .dock { bottom: max(8px, env(safe-area-inset-bottom)); }
   .desktop-foot { padding-bottom: 22px; }
 }
+
+
+/* ---------- Balanced card rows: equal height within each grid row ---------- */
+@media (min-width: 701px) {
+  .desktop {
+    align-items: stretch;
+    grid-auto-rows: auto;
+  }
+  .welcome-card,
+  .now-widget,
+  .about-widget,
+  .cta-widget {
+    align-self: stretch;
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
+  }
+  .now-widget,
+  .cta-widget {
+    justify-content: space-between;
+  }
+}
